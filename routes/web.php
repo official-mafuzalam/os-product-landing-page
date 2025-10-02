@@ -1,11 +1,15 @@
 <?php
 
+use App\Http\Controllers\Admin\AttributeController;
+use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\HomeController;
+use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Public\HomeController as PublicHomeController;
 use Illuminate\Support\Facades\Artisan;
 
 /*
@@ -30,9 +34,8 @@ Route::get('/clear-cache', function () {
 });
 
 
-Route::get('/', function () {
-    return view('welcome');
-})->name('public.welcome');
+Route::get('/', [PublicHomeController::class, 'welcome'])->name('public.welcome');
+Route::get('/products/{id}', [PublicHomeController::class, 'productDetails'])->name('public.products.details');
 
 
 
@@ -43,6 +46,19 @@ Route::middleware(['auth', 'role:super_admin|admin|user'])->group(function () {
     Route::prefix('admin')->group(function () {
 
         Route::get('/', [HomeController::class, 'index'])->name('admin.index');
+
+
+        Route::resource('products', ProductController::class)->names('admin.products');
+        Route::patch('products/{product}/toggle-status', [ProductController::class, 'toggleStatus'])->name('admin.products.toggle-status');
+        Route::patch('products/{product}/toggle-featured', [ProductController::class, 'toggleFeatured'])->name('admin.products.toggle-featured');
+        Route::post('products/{product}/set-primary-image', [ProductController::class, 'setPrimaryImage'])->name('admin.products.set-primary-image');
+
+        Route::resource('categories', CategoryController::class)->names('admin.categories');
+
+        Route::resource('attributes', AttributeController::class)->names('admin.attributes');
+        Route::get('products/{product}/attributes', [AttributeController::class, 'showAssignForm'])->name('products.attributes.assign');
+        Route::post('products/{product}/attributes', [AttributeController::class, 'assignToProduct'])->name('products.attributes.store');
+        Route::delete('products/{product}/attributes/{attribute}', [AttributeController::class, 'removeFromProduct'])->name('products.attributes.remove');
 
 
         // Profile
