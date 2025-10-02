@@ -36,13 +36,13 @@ Route::get('/clear-cache', function () {
 
 Route::get('/', [PublicHomeController::class, 'welcome'])->name('public.welcome');
 Route::get('/products/{id}', [PublicHomeController::class, 'productDetails'])->name('public.products.details');
+Route::post('/order-store', [PublicHomeController::class, 'orderStore'])->name('public.order.store');
 
 
 
 
 // For all auth user
 Route::middleware(['auth', 'role:super_admin|admin|user'])->group(function () {
-
     Route::prefix('admin')->group(function () {
 
         Route::get('/', [HomeController::class, 'index'])->name('admin.index');

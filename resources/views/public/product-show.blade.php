@@ -85,9 +85,60 @@
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 </div>
-                                <span class="text-sm text-gray-500">{{ $product->stock_quantity }} available</span>
                             </div>
                         </div>
+
+                        <!-- Product Attributes -->
+                        @if ($groupedAttributes->count() > 0)
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-gray-900 mb-4">Product Options</h3>
+                                <div class="space-y-6">
+                                    @foreach ($groupedAttributes as $attribute)
+                                        <div class="border border-gray-200 rounded-lg p-4">
+                                            <dt class="text-sm font-medium text-gray-700 mb-3">
+                                                {{ $attribute['name'] }} *
+                                            </dt>
+                                            <dd class="text-sm text-gray-900 mt-1">
+                                                <div class="flex flex-wrap gap-2">
+                                                    @foreach ($attribute['values'] as $value)
+                                                        @php
+                                                            $inputName = 'attributes[' . $attribute['id'] . ']';
+                                                            $valueId =
+                                                                $attribute['id'] .
+                                                                '_' .
+                                                                \Illuminate\Support\Str::slug($value, '_');
+                                                        @endphp
+
+                                                        <label for="{{ $valueId }}" class="cursor-pointer">
+                                                            <input type="radio" id="{{ $valueId }}"
+                                                                name="{{ $inputName }}" value="{{ $value }}"
+                                                                class="peer hidden" required
+                                                                data-attribute-id="{{ $attribute['id'] }}"
+                                                                data-attribute-name="{{ $attribute['name'] }}"
+                                                                onchange="updateSelectedAttributes()">
+                                                            <span
+                                                                class="inline-block px-4 py-2 rounded-lg border-2 border-gray-300 text-sm font-medium peer-checked:border-blue-500 peer-checked:bg-blue-500 peer-checked:text-white hover:border-blue-300 hover:bg-blue-50 transition-all duration-200">
+                                                                {{ $value }}
+                                                            </span>
+                                                        </label>
+                                                    @endforeach
+                                                </div>
+                                                <div class="mt-2 text-xs text-red-600 hidden"
+                                                    id="error-{{ $attribute['id'] }}">
+                                                    Please select {{ $attribute['name'] }}
+                                                </div>
+                                            </dd>
+                                        </div>
+                                    @endforeach
+                                </div>
+
+                                <!-- Selected Attributes Summary -->
+                                <div id="selected-attributes-summary" class="mt-4 p-4 bg-blue-50 rounded-lg hidden">
+                                    <h4 class="text-sm font-medium text-blue-900 mb-2">Selected Options:</h4>
+                                    <div id="selected-attributes-list" class="text-sm text-blue-800"></div>
+                                </div>
+                            </div>
+                        @endif
 
                         @php
                             $lang = setting('order_form_bangla') ? '1' : '0';
@@ -95,9 +146,14 @@
 
                         <!-- Order Form -->
                         <div class="border-t border-gray-200 pt-6">
-                            <form action="#" method="POST" id="checkout-form" class="space-y-6">
+                            <form action="{{ route('public.order.store') }}" method="POST" id="checkout-form"
+                                class="space-y-6">
                                 @csrf
                                 <input type="hidden" id="form-quantity" name="quantity" value="1">
+                                <input type="hidden" name="product_id" value="{{ $product->id }}">
+
+                                <!-- Hidden fields for selected attributes -->
+                                <div id="attributes-data-container"></div>
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
@@ -389,6 +445,94 @@
                 }
             }
 
+            // Update selected attributes and create hidden fields
+            function updateSelectedAttributes() {
+                const attributesContainer = document.getElementById('attributes-data-container');
+                const summaryContainer = document.getElementById('selected-attributes-summary');
+                const selectedAttributesList = document.getElementById('selected-attributes-list');
+
+                // Clear previous data
+                attributesContainer.innerHTML = '';
+                selectedAttributesList.innerHTML = '';
+
+                // Get all selected attribute radio buttons
+                const selectedAttributes = [];
+                const attributeGroups = document.querySelectorAll('input[type="radio"][name^="attributes"]:checked');
+
+                attributeGroups.forEach(radio => {
+                    const attributeId = radio.getAttribute('data-attribute-id');
+                    const attributeName = radio.getAttribute('data-attribute-name');
+                    const attributeValue = radio.value;
+
+                    // Create hidden input for form submission
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = `attributes[${attributeId}]`;
+                    hiddenInput.value = attributeValue;
+                    attributesContainer.appendChild(hiddenInput);
+
+                    // Add to selected attributes list
+                    selectedAttributes.push({
+                        name: attributeName,
+                        value: attributeValue
+                    });
+                });
+
+                // Update summary
+                if (selectedAttributes.length > 0) {
+                    summaryContainer.classList.remove('hidden');
+                    selectedAttributes.forEach(attr => {
+                        const attrElement = document.createElement('div');
+                        attrElement.className = 'flex justify-between';
+                        attrElement.innerHTML = `
+                            <span>${attr.name}:</span>
+                            <span class="font-medium">${attr.value}</span>
+                        `;
+                        selectedAttributesList.appendChild(attrElement);
+                    });
+                } else {
+                    summaryContainer.classList.add('hidden');
+                }
+
+                // Hide all error messages
+                document.querySelectorAll('[id^="error-"]').forEach(error => {
+                    error.classList.add('hidden');
+                });
+            }
+
+            // Validate attributes before form submission
+            function validateAttributes() {
+                let isValid = true;
+                const attributeGroups = document.querySelectorAll('input[type="radio"][name^="attributes"]');
+                const groupedAttributes = {};
+
+                // Group attributes by name
+                attributeGroups.forEach(radio => {
+                    const name = radio.name;
+                    if (!groupedAttributes[name]) {
+                        groupedAttributes[name] = [];
+                    }
+                    groupedAttributes[name].push(radio);
+                });
+
+                // Check if at least one option is selected for each attribute group
+                Object.keys(groupedAttributes).forEach(groupName => {
+                    const groupRadios = groupedAttributes[groupName];
+                    const isSelected = groupRadios.some(radio => radio.checked);
+
+                    if (!isSelected) {
+                        isValid = false;
+                        const attributeId = groupRadios[0].getAttribute('data-attribute-id');
+                        const errorElement = document.getElementById(`error-${attributeId}`);
+                        if (errorElement) {
+                            errorElement.classList.remove('hidden');
+                        }
+                    }
+                });
+
+                return isValid;
+            }
+
             // Tab functionality
             document.addEventListener('DOMContentLoaded', function() {
                 const tabs = document.querySelectorAll('[id^="tab-"]');
@@ -416,21 +560,33 @@
 
                 // Form submission handling
                 document.getElementById('checkout-form').addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    // Add your form submission logic here
+                    // Validate attributes first
+                    if (!validateAttributes()) {
+                        e.preventDefault();
+                        // Scroll to attributes section
+                        document.querySelector('[id^="error-"]:not(.hidden)')?.closest('.border')
+                            ?.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'center'
+                            });
+                        return;
+                    }
+
+                    // Update attributes data before submission
+                    updateSelectedAttributes();
+
+                    // Show loading state
                     const submitBtn = document.getElementById('place-order-btn');
                     const originalText = submitBtn.innerHTML;
 
                     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
                     submitBtn.disabled = true;
 
-                    // Simulate form submission
-                    setTimeout(() => {
-                        submitBtn.innerHTML = originalText;
-                        submitBtn.disabled = false;
-                        alert('Order placed successfully!');
-                    }, 2000);
+                    // Form will now submit normally with all attributes data
                 });
+
+                // Initialize attributes on page load
+                updateSelectedAttributes();
             });
         </script>
     </x-slot>

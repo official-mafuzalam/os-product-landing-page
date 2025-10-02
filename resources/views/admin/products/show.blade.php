@@ -276,7 +276,7 @@
                                 </div>
 
                                 <!-- Attributes -->
-                                {{-- @if ($groupedAttributes->count() > 0)
+                                @if ($groupedAttributes->count() > 0)
                                     <div class="md:col-span-2">
                                         <h3 class="text-lg font-medium text-gray-800 dark:text-gray-200 mb-4">
                                             Attributes
@@ -294,7 +294,7 @@
                                             @endforeach
                                         </dl>
                                     </div>
-                                @endif --}}
+                                @endif
 
                                 <!-- Specifications -->
                                 @if ($product->specifications && count($product->specifications) > 0)

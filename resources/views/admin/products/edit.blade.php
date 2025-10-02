@@ -138,7 +138,33 @@
 
                         <!-- Right Column -->
                         <div class="space-y-6">
-                            
+                            <div>
+                                <h3 class="text-lg font-medium text-gray-800 dark:text-gray-200 mb-4">Categories &
+                                    Brands</h3>
+
+                                <div class="grid grid-cols-1 gap-4">
+                                    <div>
+                                        <label for="category_id"
+                                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category
+                                            *</label>
+                                        <select id="category_id" name="category_id"
+                                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white py-2 px-3"
+                                            required>
+                                            <option value="">Select Category</option>
+                                            @foreach ($categories as $category)
+                                                <option value="{{ $category->id }}"
+                                                    {{ old('category_id', $product->category_id) == $category->id ? 'selected' : '' }}>
+                                                    {{ $category->name }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        @error('category_id')
+                                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+                                </div>
+                            </div>
+
                             <div>
                                 <h3 class="text-lg font-medium text-gray-800 dark:text-gray-200 mb-4">Product Images
                                     (Max size per photo: 400 KB)
@@ -207,6 +233,77 @@
                         </div>
                     </div>
 
+                    <!-- Product Attributes Section -->
+                    <div id="attributes-container" class="space-y-4">
+                        @if ($product->exists && isset($groupedAttributes) && $groupedAttributes->count() > 0)
+                            @foreach ($groupedAttributes as $index => $attribute)
+                                <div
+                                    class="attribute-row flex items-end space-x-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-md">
+                                    <div class="flex-1">
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Attribute
+                                        </label>
+                                        <select name="product_attributes[{{ $index }}][id]"
+                                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500
+                               dark:bg-gray-600 dark:border-gray-500 dark:text-white py-2 px-3"
+                                            required>
+                                            <option value="">Select Attribute</option>
+                                            @foreach ($allAttributes as $attr)
+                                                <option value="{{ $attr->id }}"
+                                                    {{ $attribute['id'] == $attr->id ? 'selected' : '' }}>
+                                                    {{ $attr->name }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    <div class="flex-1">
+                                        <label
+                                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Values</label>
+                                        <div class="tag-input w-full flex flex-wrap items-center rounded-md border border-gray-300
+                                dark:border-gray-500 bg-white dark:bg-gray-600 px-2 py-1 cursor-text"
+                                            data-name="product_attributes[{{ $index }}][values]">
+                                            @foreach ($attribute['values'] as $val)
+                                                <span
+                                                    class="tag bg-blue-100 text-blue-700 px-2 py-1 rounded-md text-sm mr-2 mb-1 flex items-center">
+                                                    {{ trim($val) }}
+                                                    <button type="button"
+                                                        class="remove-tag ml-1 text-red-600 hover:text-red-800">×</button>
+                                                    <input type="hidden"
+                                                        name="product_attributes[{{ $index }}][values][]"
+                                                        value="{{ trim($val) }}">
+                                                </span>
+                                            @endforeach
+                                            <input type="text"
+                                                class="tag-input-field flex-1 bg-transparent border-none focus:ring-0 focus:outline-none dark:text-white"
+                                                placeholder="Type and press Enter">
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <button type="button"
+                                            class="remove-attribute text-red-600 hover:text-red-800 bg-red-100 hover:bg-red-200
+                               px-3 py-2 rounded-md transition-colors">
+                                            Remove
+                                        </button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        @endif
+                        <button type="button" id="add-attribute"
+                            class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                                fill="currentColor">
+                                <path fill-rule="evenodd"
+                                    d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            Add Attribute
+                        </button>
+                    </div>
+
+
+
                     <!-- Specifications (JSON) -->
                     <div class="mt-6">
                         <h3 class="text-lg font-medium text-gray-800 dark:text-gray-200 mb-4">Specifications</h3>
@@ -239,6 +336,102 @@
         </div>
 
         <script>
+            // Handle dynamic addition/removal of product attributes
+            document.addEventListener('DOMContentLoaded', function() {
+                const attributesContainer = document.getElementById('attributes-container');
+                const addAttributeBtn = document.getElementById('add-attribute');
+                let attributeCount = {{ $product->exists ? $product->attributes->count() : 0 }};
+
+                function initTagInput(container) {
+                    const input = container.querySelector('.tag-input-field');
+
+                    input.addEventListener('keydown', function(e) {
+                        if (e.key === 'Enter' || e.key === ',') {
+                            e.preventDefault();
+                            const value = input.value.trim();
+                            if (value !== '') {
+                                addTag(container, value);
+                                input.value = '';
+                            }
+                        }
+                    });
+                }
+
+                function addTag(container, value) {
+                    const name = container.dataset.name;
+
+                    const tag = document.createElement('span');
+                    tag.className =
+                        "tag bg-blue-100 text-blue-700 px-2 py-1 rounded-md text-sm mr-2 mb-1 flex items-center";
+                    tag.innerHTML = `
+            ${value}
+            <button type="button" class="remove-tag ml-1 text-red-600 hover:text-red-800">×</button>
+            <input type="hidden" name="${name}[]" value="${value}">
+        `;
+
+                    const input = container.querySelector('.tag-input-field');
+                    container.insertBefore(tag, input);
+
+                    // remove event
+                    tag.querySelector('.remove-tag').addEventListener('click', () => tag.remove());
+                }
+
+                // Initialize existing tag inputs
+                document.querySelectorAll('.tag-input').forEach(initTagInput);
+
+                // Add new attribute row
+                addAttributeBtn.addEventListener('click', function() {
+                    const attributeRow = document.createElement('div');
+                    attributeRow.className =
+                        'attribute-row flex items-end space-x-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-md';
+                    attributeRow.innerHTML = `
+            <div class="flex-1">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Attribute</label>
+                <select name="product_attributes[${attributeCount}][id]"
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:text-white py-2 px-3" required>
+                    <option value="">Select Attribute</option>
+                    @foreach ($allAttributes as $attribute)
+                        <option value="{{ $attribute->id }}">{{ $attribute->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="flex-1">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Values</label>
+                <div class="tag-input w-full flex flex-wrap items-center rounded-md border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-600 px-2 py-1 cursor-text"
+                     data-name="product_attributes[${attributeCount}][values]">
+                    <input type="text"
+                           class="tag-input-field flex-1 bg-transparent border-none focus:ring-0 focus:outline-none dark:text-white"
+                           placeholder="Type and press Enter">
+                </div>
+            </div>
+            <div>
+                <button type="button" class="remove-attribute text-red-600 hover:text-red-800 bg-red-100 hover:bg-red-200 px-3 py-2 rounded-md transition-colors">
+                    Remove
+                </button>
+            </div>
+        `;
+
+                    attributesContainer.appendChild(attributeRow);
+
+                    // initialize new tag input
+                    initTagInput(attributeRow.querySelector('.tag-input'));
+
+                    // remove button
+                    attributeRow.querySelector('.remove-attribute').addEventListener('click', function() {
+                        attributeRow.remove();
+                    });
+
+                    attributeCount++;
+                });
+
+                // Add event listeners to existing remove buttons
+                document.querySelectorAll('.remove-attribute').forEach(button => {
+                    button.addEventListener('click', function() {
+                        this.closest('.attribute-row').remove();
+                    });
+                });
+            });
+
             // Handle specifications
             document.addEventListener('DOMContentLoaded', function() {
                 const container = document.getElementById('specifications-container');

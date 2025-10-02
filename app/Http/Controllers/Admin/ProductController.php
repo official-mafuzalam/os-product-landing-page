@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\Product;
+use App\Models\Attribute;
+use App\Models\ProductAttribute;
 use App\Models\ProductImage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -46,8 +49,11 @@ class ProductController extends Controller
 
     public function create()
     {
+
+        $categories = Category::where('is_active', true)->get();
+        $allAttributes = Attribute::where('is_active', true)->get();
         $product = new Product();
-        return view('admin.products.create', compact('product'));
+        return view('admin.products.create', compact('product', 'categories', 'allAttributes'));
     }
 
     /**
@@ -63,6 +69,7 @@ class ProductController extends Controller
             'discount' => 'nullable|numeric|min:0',
             'stock_quantity' => 'required|integer|min:0',
             'sku' => 'required|string|unique:products,sku',
+            'category_id' => 'required|exists:categories,id',
             'image_gallery.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:400',
             'specifications' => 'nullable|json',
             'is_active' => 'sometimes|boolean',
@@ -86,6 +93,22 @@ class ProductController extends Controller
 
             // Create product
             $product = Product::create($validated);
+
+            // Handle attributes
+            if ($request->filled('product_attributes')) { // Changed from attributes
+                foreach ($request->product_attributes as $index => $attributeData) { // Changed from attributes
+                    if (!empty($attributeData['id']) && !empty($attributeData['values'])) {
+                        foreach ($attributeData['values'] as $valueIndex => $value) {
+                            ProductAttribute::create([
+                                'product_id' => $product->id,
+                                'attribute_id' => $attributeData['id'],
+                                'value' => trim($value),
+                                'order' => $valueIndex
+                            ]);
+                        }
+                    }
+                }
+            }
 
             // Handle gallery images
             if ($request->hasFile('image_gallery')) {
@@ -123,8 +146,17 @@ class ProductController extends Controller
      */
     public function show(Product $product)
     {
-        $product->load(['images']);
-        return view('admin.products.show', compact('product'));
+        $product->load(['category', 'images']);
+        $groupedAttributes = $product->attributes
+            ->groupBy('id')
+            ->map(function ($items) {
+                return [
+                    'name' => $items->first()->name,
+                    'values' => $items->pluck('pivot.value')->unique()->toArray(),
+                ];
+            });
+
+        return view('admin.products.show', compact('product', 'groupedAttributes'));
     }
 
     /**
@@ -132,7 +164,29 @@ class ProductController extends Controller
      */
     public function edit(Product $product)
     {
-        return view('admin.products.edit', compact('product'));
+        $categories = Category::where('is_active', true)->get();
+        $allAttributes = Attribute::where('is_active', true)->get();
+
+        // Load product attributes with pivot values
+        $product->load('attributes');
+
+        // Group attributes by attribute_id and collect values
+        $groupedAttributes = $product->attributes
+            ->groupBy('id')
+            ->map(function ($items) {
+                return [
+                    'id' => $items->first()->id,
+                    'name' => $items->first()->name,
+                    'values' => $items->pluck('pivot.value')->toArray()
+                ];
+            })->values(); // reset keys
+
+        return view('admin.products.edit', compact(
+            'product',
+            'categories',
+            'allAttributes',
+            'groupedAttributes'
+        ));
     }
 
 
@@ -173,6 +227,33 @@ class ProductController extends Controller
 
             // Update product
             $product->update($validated);
+
+            // --- Handle product attributes ---
+            // Remove all old attributes
+            ProductAttribute::where('product_id', $product->id)->delete();
+
+            if ($request->filled('product_attributes')) { // Changed from attributes
+                foreach ($request->product_attributes as $order => $attributeData) { // Changed from attributes
+                    $attrId = $attributeData['id'] ?? null;
+                    $values = $attributeData['values'] ?? [];
+
+                    if ($attrId && !empty($values)) {
+                        foreach ($values as $valueIndex => $value) {
+                            ProductAttribute::create([
+                                'product_id' => $product->id,
+                                'attribute_id' => (int) $attrId,
+                                'value' => trim($value),
+                                'order' => $valueIndex,
+                            ]);
+                        }
+                    }
+                }
+
+                Log::info('Product attributes synced', [
+                    'product_id' => $product->id,
+                    'product_attributes' => $request->input('product_attributes', []) // Changed from attributes
+                ]);
+            }
 
             // Handle gallery images
             if ($request->hasFile('image_gallery')) {
