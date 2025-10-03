@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\HomeController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Public\HomeController as PublicHomeController;
 use Illuminate\Support\Facades\Artisan;
@@ -59,6 +60,10 @@ Route::middleware(['auth', 'role:super_admin|admin|user'])->group(function () {
         Route::get('products/{product}/attributes', [AttributeController::class, 'showAssignForm'])->name('products.attributes.assign');
         Route::post('products/{product}/attributes', [AttributeController::class, 'assignToProduct'])->name('products.attributes.store');
         Route::delete('products/{product}/attributes/{attribute}', [AttributeController::class, 'removeFromProduct'])->name('products.attributes.remove');
+
+
+        Route::get('settings', [SettingController::class, 'index'])->name('admin.settings.index');
+        Route::put('settings', [SettingController::class, 'update'])->name('admin.settings.update');
 
 
         // Profile

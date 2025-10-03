@@ -1,4 +1,3 @@
-
 <script>
     const HSThemeAppearance = {
         init() {
@@ -86,6 +85,9 @@
         })
     })
 </script>
+
+@stack('scripts')
+
 </body>
 
 </html>
