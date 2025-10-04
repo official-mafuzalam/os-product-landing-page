@@ -12,6 +12,12 @@ class HomeController extends Controller
     {
         $products = Product::active()->take(8)->get();
         $featuredProducts = Product::active()->featured()->take(8)->get();
+
+        if ($products->count() <= 1) {
+            $product = $products->first();
+            return view('public.single-welcome', compact('products', 'featuredProducts', 'product'));
+        }
+
         return view('public.welcome', compact('products', 'featuredProducts'));
     }
 

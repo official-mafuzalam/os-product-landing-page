@@ -41,7 +41,6 @@ Route::post('/order-store', [PublicHomeController::class, 'orderStore'])->name('
 
 
 
-
 // For all auth user
 Route::middleware(['auth', 'role:super_admin|admin|user'])->group(function () {
     Route::prefix('admin')->group(function () {
